@@ -26,23 +26,25 @@ class ReminderWorker(
 
     private fun showNotification(deckName: String?, isSpecific: Boolean) {
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "study_reminder_channel"
+        
+        // Sử dụng Channel ID mới để đảm bảo mức ưu tiên cao nhất
+        val channelId = if (isSpecific) "study_schedule_urgent" else "study_reminder_daily"
+        val channelName = if (isSpecific) "Lịch học cụ thể" else "Nhắc nhở hàng ngày"
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Nhắc nhở học tập",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Kênh thông báo nhắc nhở học bài"
+            val importance = if (isSpecific) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
+            val channel = NotificationChannel(channelId, channelName, importance).apply {
+                description = "Kênh thông báo nhắc học bài"
+                enableLights(true)
+                enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
         }
 
-        val title = if (isSpecific) "Giờ học bài đã đến!" else "Đã đến lúc ôn tập!"
+        val title = if (isSpecific) "Đã đến giờ học bài!" else "Bạn ơi, vào ôn tập nhé!"
         val content = if (isSpecific && deckName != null) 
-            "Hôm nay bạn đã hẹn học bộ thẻ: $deckName. Mở app ngay nhé!" 
-            else "Đừng quên dành ít phút để ôn tập các flashcards của bạn hôm nay."
+            "Bắt đầu học bộ thẻ: $deckName ngay thôi nào." 
+            else "Đừng quên dành 5 phút để ôn tập hôm nay nhé."
 
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -50,7 +52,7 @@ class ReminderWorker(
         
         val pendingIntent = PendingIntent.getActivity(
             applicationContext, 
-            0, 
+            System.currentTimeMillis().toInt(), // ID duy nhất cho Intent
             intent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
@@ -59,11 +61,14 @@ class ReminderWorker(
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (isSpecific) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL) // Rung và chuông
             .build()
 
-        notificationManager.notify(if (isSpecific) 101 else 1, notification)
+        // Sử dụng ID ngẫu nhiên để các thông báo không đè lên nhau
+        val notificationId = if (isSpecific) System.currentTimeMillis().toInt() else 1
+        notificationManager.notify(notificationId, notification)
     }
 }
