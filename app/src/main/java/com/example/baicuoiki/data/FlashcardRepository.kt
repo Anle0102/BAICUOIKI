@@ -26,6 +26,9 @@ class FlashcardRepository @Inject constructor(
         
     fun getFlashcardsToReview(currentTime: Long): Flow<List<Flashcard>> =
         flashcardDao.getFlashcardsToReview(currentTime)
+
+    fun searchFlashcards(query: String): Flow<List<Flashcard>> =
+        flashcardDao.searchFlashcards(query)
         
     suspend fun insertFlashcard(flashcard: Flashcard) = 
         flashcardDao.insertFlashcard(flashcard)
