@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baicuoiki.data.*
 import com.example.baicuoiki.util.SM2Algorithm
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -13,6 +14,9 @@ import javax.inject.Inject
 class FlashcardViewModel @Inject constructor(
     private val repository: FlashcardRepository
 ) : ViewModel() {
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
 
     val decks: StateFlow<List<Deck>> = repository.getAllDecks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -28,9 +32,23 @@ class FlashcardViewModel @Inject constructor(
         return repository.getFlashcardsToReview(System.currentTimeMillis())
     }
 
+    fun searchCards(query: String): Flow<List<Flashcard>> {
+        return repository.searchFlashcards(query)
+    }
+
     fun getStudyCountPastWeek(): Flow<Int> {
         val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
         return repository.getLogCountSince(oneWeekAgo)
+    }
+
+    // --- Export Logic ---
+    fun exportDeckToJson(deck: Deck, cards: List<Flashcard>): String {
+        val exportData = DeckExport(
+            deckName = deck.name,
+            description = deck.description,
+            cards = cards.map { CardExport(it.front, it.back) }
+        )
+        return Gson().toJson(exportData)
     }
 
     // --- Deck CRUD ---
@@ -53,9 +71,9 @@ class FlashcardViewModel @Inject constructor(
     }
 
     // --- Flashcard CRUD ---
-    fun addFlashcard(deckId: Long, front: String, back: String) {
+    fun addFlashcard(deckId: Long, front: String, back: String, hint: String = "") {
         viewModelScope.launch {
-            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back))
+            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back, hint = hint))
         }
     }
 
