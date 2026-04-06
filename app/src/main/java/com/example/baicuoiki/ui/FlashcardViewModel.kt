@@ -14,6 +14,9 @@ class FlashcardViewModel @Inject constructor(
     private val repository: FlashcardRepository
 ) : ViewModel() {
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
+
     val decks: StateFlow<List<Deck>> = repository.getAllDecks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -26,6 +29,10 @@ class FlashcardViewModel @Inject constructor(
 
     fun getCardsToReviewToday(): Flow<List<Flashcard>> {
         return repository.getFlashcardsToReview(System.currentTimeMillis())
+    }
+
+    fun searchCards(query: String): Flow<List<Flashcard>> {
+        return repository.searchFlashcards(query)
     }
 
     fun getStudyCountPastWeek(): Flow<Int> {
@@ -53,9 +60,9 @@ class FlashcardViewModel @Inject constructor(
     }
 
     // --- Flashcard CRUD ---
-    fun addFlashcard(deckId: Long, front: String, back: String) {
+    fun addFlashcard(deckId: Long, front: String, back: String, hint: String = "") {
         viewModelScope.launch {
-            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back))
+            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back, hint = hint))
         }
     }
 
