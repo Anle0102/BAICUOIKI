@@ -14,6 +14,9 @@ interface FlashcardDao {
     @Query("SELECT * FROM flashcards WHERE nextReview <= :currentTime")
     fun getFlashcardsToReview(currentTime: Long): Flow<List<Flashcard>>
 
+    @Query("SELECT * FROM flashcards WHERE front LIKE '%' || :query || '%' OR back LIKE '%' || :query || '%'")
+    fun searchFlashcards(query: String): Flow<List<Flashcard>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFlashcard(flashcard: Flashcard)
 
