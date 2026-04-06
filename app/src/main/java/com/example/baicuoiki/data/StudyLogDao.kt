@@ -15,4 +15,8 @@ interface StudyLogDao {
 
     @Query("SELECT COUNT(*) FROM study_logs WHERE timestamp >= :startTime")
     fun getLogCountSince(startTime: Long): Flow<Int>
+
+    // Lấy số lượng thẻ đã học trong 7 ngày gần nhất, nhóm theo ngày
+    @Query("SELECT COUNT(*) FROM study_logs WHERE timestamp >= :startTime GROUP BY (timestamp / 86400000)")
+    fun getDailyStats(startTime: Long): Flow<List<Int>>
 }

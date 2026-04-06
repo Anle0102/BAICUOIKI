@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baicuoiki.data.*
 import com.example.baicuoiki.util.SM2Algorithm
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -38,6 +39,16 @@ class FlashcardViewModel @Inject constructor(
     fun getStudyCountPastWeek(): Flow<Int> {
         val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
         return repository.getLogCountSince(oneWeekAgo)
+    }
+
+    // --- Export Logic ---
+    fun exportDeckToJson(deck: Deck, cards: List<Flashcard>): String {
+        val exportData = DeckExport(
+            deckName = deck.name,
+            description = deck.description,
+            cards = cards.map { CardExport(it.front, it.back) }
+        )
+        return Gson().toJson(exportData)
     }
 
     // --- Deck CRUD ---
