@@ -1,4 +1,4 @@
-sh
+
 # 1. Chuyển sang nhánh auth
 git checkout feature/auth-An
 
