@@ -75,10 +75,15 @@ fun ScheduleScreen(
                 decks = decks,
                 onDismiss = { showAddDialog = false },
                 onConfirm = { deckId, deckName, timeMillis ->
+                    // 1. Lưu vào Database
                     viewModel.addSchedule(deckId, deckName, timeMillis)
-                    // GỌI WORKMANAGER ĐỂ HẸN GIỜ THÔNG BÁO
+                    
+                    // 2. Hẹn giờ thông báo thông qua WorkManager
+                    // Sử dụng thời gian hiện tại làm ID tạm thời để thông báo không bị trùng
                     WorkManagerHelper.scheduleSpecificStudySession(context, System.currentTimeMillis(), deckName, timeMillis)
-                    Toast.makeText(context, "Đã hẹn lịch học: $deckName", Toast.LENGTH_SHORT).show()
+                    
+                    val sdf = SimpleDateFormat("HH:mm - dd/MM", Locale("vi", "VN"))
+                    Toast.makeText(context, "Đã đặt lịch: $deckName lúc ${sdf.format(Date(timeMillis))}", Toast.LENGTH_LONG).show()
                     showAddDialog = false
                 }
             )
@@ -182,7 +187,7 @@ fun AddScheduleDialog(
                                 { _, y, m, d ->
                                     calendar.set(y, m, d)
                                     selectedDateMillis = calendar.timeInMillis
-                                    dateText = "$d/${m + 1}/$y"
+                                    dateText = String.format(Locale.getDefault(), "%02d/%02d/%04d", d, m + 1, y)
                                 },
                                 calendar.get(Calendar.YEAR),
                                 calendar.get(Calendar.MONTH),
@@ -231,7 +236,13 @@ fun AddScheduleDialog(
                         finalCalendar.set(Calendar.HOUR_OF_DAY, selectedHour)
                         finalCalendar.set(Calendar.MINUTE, selectedMinute)
                         finalCalendar.set(Calendar.SECOND, 0)
-                        onConfirm(selectedDeck!!.id, selectedDeck!!.name, finalCalendar.timeInMillis)
+                        
+                        // Kiểm tra nếu thời gian đặt lịch nhỏ hơn hiện tại
+                        if (finalCalendar.timeInMillis < System.currentTimeMillis()) {
+                            Toast.makeText(context, "Vui lòng chọn thời gian trong tương lai", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onConfirm(selectedDeck!!.id, selectedDeck!!.name, finalCalendar.timeInMillis)
+                        }
                     }
                 },
                 enabled = selectedDeck != null && selectedDateMillis != 0L && selectedHour != -1

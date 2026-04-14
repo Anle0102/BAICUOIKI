@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
                         composable("profile") {
                             ProfileScreen(
                                 authViewModel = authViewModel,
+                                flashcardViewModel = flashcardViewModel,
                                 onBack = {
                                     navController.popBackStack()
                                 },

@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.example.baicuoiki.data.Deck
 
@@ -28,13 +29,14 @@ fun DeckScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf<Deck?>(null) }
     
-    var deckName by remember { mutableStateOf("") }
-    var deckDescription by remember { mutableStateOf("") }
-    
-    var searchQuery by remember { mutableStateOf("") }
+    // Sử dụng TextFieldValue để hỗ trợ gõ Tiếng Việt
+    var deckName by remember { mutableStateOf(TextFieldValue("")) }
+    var deckDescription by remember { mutableStateOf(TextFieldValue("")) }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
+
     val filteredDecks = decks.filter { 
-        it.name.contains(searchQuery, ignoreCase = true) || 
-        it.description.contains(searchQuery, ignoreCase = true) 
+        it.name.contains(searchQuery.text, ignoreCase = true) || 
+        it.description.contains(searchQuery.text, ignoreCase = true) 
     }
 
     Scaffold(
@@ -50,8 +52,8 @@ fun DeckScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { 
-                deckName = ""
-                deckDescription = ""
+                deckName = TextFieldValue("")
+                deckDescription = TextFieldValue("")
                 showAddDialog = true 
             }) {
                 Icon(Icons.Default.Add, contentDescription = "Thêm bộ thẻ")
@@ -59,7 +61,7 @@ fun DeckScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            // Thanh tìm kiếm
+            // Thanh tìm kiếm hỗ trợ Tiếng Việt
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -101,8 +103,8 @@ fun DeckScreen(
                             }
                             Row {
                                 IconButton(onClick = { 
-                                    deckName = deck.name
-                                    deckDescription = deck.description
+                                    deckName = TextFieldValue(deck.name)
+                                    deckDescription = TextFieldValue(deck.description)
                                     showEditDialog = deck 
                                 }) {
                                     Icon(Icons.Default.Edit, contentDescription = "Sửa")
@@ -126,8 +128,8 @@ fun DeckScreen(
                 onNameChange = { deckName = it },
                 onDescriptionChange = { deckDescription = it },
                 onConfirm = {
-                    if (deckName.isNotBlank()) {
-                        viewModel.addDeck(deckName, deckDescription)
+                    if (deckName.text.isNotBlank()) {
+                        viewModel.addDeck(deckName.text, deckDescription.text)
                         showAddDialog = false
                     }
                 },
@@ -144,8 +146,8 @@ fun DeckScreen(
                 onNameChange = { deckName = it },
                 onDescriptionChange = { deckDescription = it },
                 onConfirm = {
-                    if (deckName.isNotBlank()) {
-                        viewModel.updateDeck(deck.copy(name = deckName, description = deckDescription))
+                    if (deckName.text.isNotBlank()) {
+                        viewModel.updateDeck(deck.copy(name = deckName.text, description = deckDescription.text))
                         showEditDialog = null
                     }
                 },
@@ -158,10 +160,10 @@ fun DeckScreen(
 @Composable
 fun DeckDialog(
     title: String,
-    name: String,
-    description: String,
-    onNameChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit,
+    name: TextFieldValue,
+    description: TextFieldValue,
+    onNameChange: (TextFieldValue) -> Unit,
+    onDescriptionChange: (TextFieldValue) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -170,18 +172,22 @@ fun DeckDialog(
         title = { Text(title) },
         text = {
             Column {
-                TextField(
+                OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
                     label = { Text("Tên bộ thẻ") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(
+                OutlinedTextField(
                     value = description,
                     onValueChange = onDescriptionChange,
                     label = { Text("Mô tả") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                    shape = MaterialTheme.shapes.medium
                 )
             }
         },
