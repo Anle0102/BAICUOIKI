@@ -11,12 +11,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.example.baicuoiki.data.Flashcard
 import com.example.baicuoiki.util.TtsHelper
@@ -33,71 +38,120 @@ fun StudyScreen(
     
     val cards by viewModel.getFlashcardsForDeck(deckId).collectAsState(initial = emptyList())
     
-    var isStudyMode by remember { mutableStateOf(true) }
+    var isStudyMode by remember { mutableStateOf(false) }
     var currentIndex by remember { mutableIntStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
     
     var showAddCardDialog by remember { mutableStateOf(false) }
     var showEditCardDialog by remember { mutableStateOf<Flashcard?>(null) }
-    var cardFront by remember { mutableStateOf("") }
-    var cardBack by remember { mutableStateOf("") }
+    
+    var cardFront by remember { mutableStateOf(TextFieldValue("")) }
+    var cardBack by remember { mutableStateOf(TextFieldValue("")) }
 
+    // Quản lý session học tập và ghi nhận thời gian
+    LaunchedEffect(isStudyMode) {
+        if (isStudyMode && cards.isNotEmpty()) {
+            viewModel.startStudySession()
+        } else if (!isStudyMode) {
+            viewModel.endStudySession()
+        }
+    }
+
+    // Đảm bảo kết thúc session khi thoát màn hình
     DisposableEffect(Unit) {
-        onDispose { ttsHelper.shutdown() }
+        onDispose { 
+            if (isStudyMode) {
+                viewModel.endStudySession()
+            }
+            ttsHelper.shutdown() 
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isStudyMode) "Học tập" else "Quản lý thẻ") },
+                title = { Text(if (isStudyMode) "Đang học" else "Quản lý thẻ") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = { isStudyMode = !isStudyMode }) {
-                        Text(if (isStudyMode) "Xem danh sách" else "Bắt đầu học")
                     }
                 }
             )
         },
         floatingActionButton = {
-            if (!isStudyMode) {
-                FloatingActionButton(onClick = {
-                    cardFront = ""
-                    cardBack = ""
-                    showAddCardDialog = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = "Thêm thẻ")
+            Column(horizontalAlignment = Alignment.End) {
+                if (!isStudyMode) {
+                    // Nút Thêm Thẻ Mới
+                    SmallFloatingActionButton(
+                        onClick = {
+                            cardFront = TextFieldValue("")
+                            cardBack = TextFieldValue("")
+                            showAddCardDialog = true
+                        },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Thêm thẻ")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // Nút Bắt đầu / Kết thúc học
+                if (cards.isNotEmpty() || isStudyMode) {
+                    ExtendedFloatingActionButton(
+                        onClick = { 
+                            isStudyMode = !isStudyMode
+                            if (!isStudyMode) {
+                                currentIndex = 0
+                                isFlipped = false
+                            }
+                        },
+                        containerColor = if (isStudyMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        contentColor = if (isStudyMode) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
+                        icon = {
+                            Icon(
+                                if (isStudyMode) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = null
+                            )
+                        },
+                        text = {
+                            Text(if (isStudyMode) "Kết thúc học" else "Bắt đầu học")
+                        }
+                    )
                 }
             }
         }
     ) { padding ->
         if (isStudyMode) {
-            StudyContent(
-                cards = cards,
-                currentIndex = currentIndex,
-                isFlipped = isFlipped,
-                onFlip = { isFlipped = !isFlipped },
-                onSpeak = { text -> ttsHelper.speak(text) },
-                onRate = { quality ->
-                    viewModel.updateFlashcardReview(cards[currentIndex], quality)
-                    if (currentIndex < cards.size - 1) {
-                        currentIndex++
-                        isFlipped = false
-                    } else {
-                        onBack()
-                    }
-                },
-                modifier = Modifier.padding(padding)
-            )
+            if (cards.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text("Chưa có thẻ nào để học!")
+                }
+            } else {
+                StudyContent(
+                    cards = cards,
+                    currentIndex = currentIndex,
+                    isFlipped = isFlipped,
+                    onFlip = { isFlipped = !isFlipped },
+                    onSpeak = { text -> ttsHelper.speak(text) },
+                    onRate = { quality ->
+                        viewModel.updateFlashcardReview(cards[currentIndex], quality)
+                        if (currentIndex < cards.size - 1) {
+                            currentIndex++
+                            isFlipped = false
+                        } else {
+                            isStudyMode = false // Tự động kết thúc khi hết thẻ
+                        }
+                    },
+                    modifier = Modifier.padding(padding)
+                )
+            }
         } else {
             CardListContent(
                 cards = cards,
                 onEdit = { card ->
-                    cardFront = card.front
-                    cardBack = card.back
+                    cardFront = TextFieldValue(card.front)
+                    cardBack = TextFieldValue(card.back)
                     showEditCardDialog = card
                 },
                 onDelete = { viewModel.deleteFlashcard(it) },
@@ -114,8 +168,8 @@ fun StudyScreen(
                 onFrontChange = { cardFront = it },
                 onBackChange = { cardBack = it },
                 onConfirm = {
-                    if (cardFront.isNotBlank() && cardBack.isNotBlank()) {
-                        viewModel.addFlashcard(deckId, cardFront, cardBack)
+                    if (cardFront.text.isNotBlank() && cardBack.text.isNotBlank()) {
+                        viewModel.addFlashcard(deckId, cardFront.text, cardBack.text)
                         showAddCardDialog = false
                     }
                 },
@@ -132,8 +186,8 @@ fun StudyScreen(
                 onFrontChange = { cardFront = it },
                 onBackChange = { cardBack = it },
                 onConfirm = {
-                    if (cardFront.isNotBlank() && cardBack.isNotBlank()) {
-                        viewModel.updateFlashcard(card.copy(front = cardFront, back = cardBack))
+                    if (cardFront.text.isNotBlank() && cardBack.text.isNotBlank()) {
+                        viewModel.updateFlashcard(card.copy(front = cardFront.text, back = cardBack.text))
                         showEditCardDialog = null
                     }
                 },
@@ -194,8 +248,6 @@ fun StudyContent(
                     Text("Xem đáp án")
                 }
             }
-        } else {
-            Text("Chưa có thẻ nào trong bộ này. Hãy thêm thẻ trước!")
         }
     }
 }
@@ -207,28 +259,47 @@ fun CardListContent(
     onDelete: (Flashcard) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(cards) { card ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                Row(
+    if (cards.isEmpty()) {
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Chưa có thẻ nào. Nhấn nút + để thêm!")
+        }
+    } else {
+        LazyColumn(modifier = modifier.fillMaxSize()) {
+            items(cards) { card ->
+                var isVisible by remember { mutableStateOf(false) }
+                Card(
                     modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .clickable { isVisible = !isVisible }
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Mặt trước: ${card.front}", style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "Mặt sau: ${card.back}", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    IconButton(onClick = { onEdit(card) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Sửa")
-                    }
-                    IconButton(onClick = { onDelete(card) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Xóa")
+                    Row(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Câu hỏi: ${card.front}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            if (isVisible) {
+                                Text(text = "Đáp án: ${card.back}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            } else {
+                                Text(text = "Chạm để xem đáp án", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                        IconButton(onClick = { isVisible = !isVisible }) {
+                            Icon(
+                                imageVector = if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = null
+                            )
+                        }
+                        IconButton(onClick = { onEdit(card) }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Sửa")
+                        }
+                        IconButton(onClick = { onDelete(card) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Xóa")
+                        }
                     }
                 }
             }
@@ -239,10 +310,10 @@ fun CardListContent(
 @Composable
 fun FlashcardDialog(
     title: String,
-    front: String,
-    back: String,
-    onFrontChange: (String) -> Unit,
-    onBackChange: (String) -> Unit,
+    front: TextFieldValue,
+    back: TextFieldValue,
+    onFrontChange: (TextFieldValue) -> Unit,
+    onBackChange: (TextFieldValue) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -251,18 +322,20 @@ fun FlashcardDialog(
         title = { Text(title) },
         text = {
             Column {
-                TextField(
+                OutlinedTextField(
                     value = front,
                     onValueChange = onFrontChange,
                     label = { Text("Mặt trước (Câu hỏi)") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(
+                OutlinedTextField(
                     value = back,
                     onValueChange = onBackChange,
                     label = { Text("Mặt sau (Đáp án)") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
                 )
             }
         },

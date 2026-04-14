@@ -43,6 +43,10 @@ class FlashcardRepository @Inject constructor(
     suspend fun insertLog(log: StudyLog) = studyLogDao.insertLog(log)
     
     fun getLogCountSince(startTime: Long) = studyLogDao.getLogCountSince(startTime)
+    
+    fun getDailyStats(startTime: Long) = studyLogDao.getDailyStats(startTime)
+
+    fun getDailyStudyTime(startTime: Long) = studyLogDao.getDailyStudyTime(startTime)
 
     // --- Schedule Operations ---
     fun getAllSchedules(): Flow<List<StudySchedule>> = studyScheduleDao.getAllSchedules()

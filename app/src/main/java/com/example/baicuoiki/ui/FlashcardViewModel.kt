@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baicuoiki.data.*
 import com.example.baicuoiki.util.SM2Algorithm
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -14,11 +16,30 @@ class FlashcardViewModel @Inject constructor(
     private val repository: FlashcardRepository
 ) : ViewModel() {
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
+
     val decks: StateFlow<List<Deck>> = repository.getAllDecks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val schedules: StateFlow<List<StudySchedule>> = repository.getAllSchedules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private var sessionStartTime: Long = 0
+
+    fun startStudySession() {
+        sessionStartTime = System.currentTimeMillis()
+    }
+
+    fun endStudySession() {
+        if (sessionStartTime == 0L) return
+        val endTime = System.currentTimeMillis()
+        val duration = endTime - sessionStartTime
+        viewModelScope.launch {
+            repository.insertLog(StudyLog(type = "SESSION", durationMs = duration, timestamp = endTime))
+        }
+        sessionStartTime = 0
+    }
 
     fun getFlashcardsForDeck(deckId: Long): Flow<List<Flashcard>> {
         return repository.getFlashcardsByDeck(deckId)
@@ -28,9 +49,45 @@ class FlashcardViewModel @Inject constructor(
         return repository.getFlashcardsToReview(System.currentTimeMillis())
     }
 
+    fun searchFlashcards(query: String): Flow<List<Flashcard>> {
+        return repository.searchFlashcards(query)
+    }
+
+    // Lấy thống kê học tập 7 ngày qua (số lượng thẻ)
+    fun getStudyStatsPastWeek(): Flow<List<Int>> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+        
+        return repository.getDailyStats(calendar.timeInMillis)
+    }
+
+    // Lấy thống kê thời gian học 7 ngày qua (miligiây)
+    fun getStudyTimePastWeek(): Flow<List<Long>> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+
+        return repository.getDailyStudyTime(calendar.timeInMillis)
+    }
+
     fun getStudyCountPastWeek(): Flow<Int> {
         val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
         return repository.getLogCountSince(oneWeekAgo)
+    }
+
+    // --- Export/Import Logic ---
+    fun exportDeckToJson(deck: Deck, cards: List<Flashcard>): String {
+        val exportData = DeckExport(
+            deckName = deck.name,
+            description = deck.description,
+            cards = cards.map { CardExport(it.front, it.back) }
+        )
+        return Gson().toJson(exportData)
     }
 
     // --- Deck CRUD ---
@@ -53,9 +110,9 @@ class FlashcardViewModel @Inject constructor(
     }
 
     // --- Flashcard CRUD ---
-    fun addFlashcard(deckId: Long, front: String, back: String) {
+    fun addFlashcard(deckId: Long, front: String, back: String, hint: String = "") {
         viewModelScope.launch {
-            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back))
+            repository.insertFlashcard(Flashcard(deckId = deckId, front = front, back = back, hint = hint))
         }
     }
 
@@ -81,7 +138,7 @@ class FlashcardViewModel @Inject constructor(
                 nextReview = result.nextReview
             )
             repository.updateFlashcard(updatedCard)
-            repository.insertLog(StudyLog(cardId = card.id, quality = quality))
+            repository.insertLog(StudyLog(cardId = card.id, quality = quality, type = "CARD"))
         }
     }
 

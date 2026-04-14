@@ -55,6 +55,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     
+    // AI
+    implementation(libs.google.generativeai)
+    
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
