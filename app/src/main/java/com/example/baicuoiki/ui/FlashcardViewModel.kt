@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,6 +25,22 @@ class FlashcardViewModel @Inject constructor(
     val schedules: StateFlow<List<StudySchedule>> = repository.getAllSchedules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private var sessionStartTime: Long = 0
+
+    fun startStudySession() {
+        sessionStartTime = System.currentTimeMillis()
+    }
+
+    fun endStudySession() {
+        if (sessionStartTime == 0L) return
+        val endTime = System.currentTimeMillis()
+        val duration = endTime - sessionStartTime
+        viewModelScope.launch {
+            repository.insertLog(StudyLog(type = "SESSION", durationMs = duration, timestamp = endTime))
+        }
+        sessionStartTime = 0
+    }
+
     fun getFlashcardsForDeck(deckId: Long): Flow<List<Flashcard>> {
         return repository.getFlashcardsByDeck(deckId)
     }
@@ -32,8 +49,30 @@ class FlashcardViewModel @Inject constructor(
         return repository.getFlashcardsToReview(System.currentTimeMillis())
     }
 
-    fun searchCards(query: String): Flow<List<Flashcard>> {
+    fun searchFlashcards(query: String): Flow<List<Flashcard>> {
         return repository.searchFlashcards(query)
+    }
+
+    // Lấy thống kê học tập 7 ngày qua (số lượng thẻ)
+    fun getStudyStatsPastWeek(): Flow<List<Int>> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+        
+        return repository.getDailyStats(calendar.timeInMillis)
+    }
+
+    // Lấy thống kê thời gian học 7 ngày qua (miligiây)
+    fun getStudyTimePastWeek(): Flow<List<Long>> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+
+        return repository.getDailyStudyTime(calendar.timeInMillis)
     }
 
     fun getStudyCountPastWeek(): Flow<Int> {
@@ -41,7 +80,7 @@ class FlashcardViewModel @Inject constructor(
         return repository.getLogCountSince(oneWeekAgo)
     }
 
-    // --- Export Logic ---
+    // --- Export/Import Logic ---
     fun exportDeckToJson(deck: Deck, cards: List<Flashcard>): String {
         val exportData = DeckExport(
             deckName = deck.name,
@@ -99,7 +138,7 @@ class FlashcardViewModel @Inject constructor(
                 nextReview = result.nextReview
             )
             repository.updateFlashcard(updatedCard)
-            repository.insertLog(StudyLog(cardId = card.id, quality = quality))
+            repository.insertLog(StudyLog(cardId = card.id, quality = quality, type = "CARD"))
         }
     }
 

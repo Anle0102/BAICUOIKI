@@ -3,7 +3,7 @@ package com.example.baicuoiki.data
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
-@Database(entities = [Flashcard::class, Deck::class, User::class, StudyLog::class, StudySchedule::class], version = 5, exportSchema = false)
+@Database(entities = [Flashcard::class, Deck::class, User::class, StudyLog::class, StudySchedule::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun flashcardDao(): FlashcardDao
     abstract fun deckDao(): DeckDao
